@@ -16,9 +16,14 @@ As of August 2019, [Snyk](https://snyk.io/) badges currently only work for publi
     SNYK_API_KEY="Your Snyk API key"
     ```
 4. Run `go build snyk.go && ./snyk`
-5. Visit http://localhost:8080/badge/?org={username}&name={repo_name} (Replace `{username}` and `{repo_name}` with your own GitHub username and the private repository you have access to, respectively)
+5. Visit http://localhost:8080/api/badges/?org={username}&name={repo_name} (Replace `{username}` and `{repo_name}` with your own GitHub username and the private repository you have access to, respectively)
 
-**Note:** You can use http://localhost:8080/badge/?org={username}&name={repo_name}&id={project_id_snyk} to be more precisely which repository you want to have a badge. Or you can sum multiple ids: http://localhost:8080/badge/?org={username}&name={repo_name}&id={project_id_snyk}&id={another_project_id_snyk}
+**Note:** You can use http://localhost:8080/api/badges/?org={username}&name={repo_name}&id={project_id_snyk} to be more precisely which repository you want to have a badge. Or you can sum multiple ids: http://localhost:8080/api/badges/?org={username}&name={repo_name}&id={project_id_snyk}&id={another_project_id_snyk}
+
+**Note:** You can run the build with parameters to make a package with Version and Commit in http://localhost:8080/api/version endpoint.
+```bash
+go build -ldflags "-s -w -X main.Version=1.0.0 -X main.Commit=$(git rev-parse HEAD)" snyk.go
+```
 
 ## How it works
 Hits the [List All Projects](https://snyk.docs.apiary.io/#reference/projects/all-projects/list-all-projects) API and gets a list of all the projects in your organisation. Searches for the repo you mentioned in the URL and counts the number of issues in it. If the number of issues is 0, gives a green badge. If more than 0, gives a red badge with the total number of issues as the value. If access unavailable gives a grey badge.
