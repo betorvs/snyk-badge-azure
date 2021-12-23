@@ -12,31 +12,31 @@ import (
 	"strings"
 )
 
-const (
+var (
 	// UnknownURL string
 	UnknownURL = "https://img.shields.io/badge/vulnerabilities-unknown-inactive?logo=snyk"
 	// GreenURL string
 	GreenURL = "https://img.shields.io/badge/vulnerabilities-0-brightgreen?logo=snyk"
-)
-
-var (
+	// RedURL string
+	RedURL = "https://img.shields.io/badge/vulnerabilities"
+	// RedURLSuffix string
+	RedURLSuffix = "red?logo=snyk"
 	// Version string
 	Version = "1.0.0"
 	// Commit string
 	Commit = "no-data"
+	// Client *http.Client
+	Client *http.Client
+	// APIURL string
+	APIURL string
 )
 
 // Handle the API request for badge creation.
 // Hit Snyk's List Projects API and get a list of projects. Check if the caller has access to the repo referred to by
 // username/repo and return a badge if access.
-func badgeHandler(w http.ResponseWriter, r *http.Request, username, repo string, projectID []string) {
+func badgeHandler(w http.ResponseWriter, r *http.Request, apiURL, username, repo string, projectID []string) {
 	// Default shields.io badge URL
 	badgeURL := UnknownURL
-
-	client := &http.Client{}
-
-	// Generate the Snyk API URL
-	apiURL := fmt.Sprintf("https://snyk.io/api/v1/org/%s/projects", os.Getenv("SNYK_ORG_ID"))
 
 	// Setup the GET request
 	req, _ := http.NewRequest("GET", apiURL, nil)
@@ -46,7 +46,7 @@ func badgeHandler(w http.ResponseWriter, r *http.Request, username, repo string,
 	req.Header.Add("Authorization", os.Getenv("SNYK_API_KEY"))
 
 	// Perform the request
-	resp, err := client.Do(req)
+	resp, err := Client.Do(req)
 
 	// Could not perform the request
 	// Likely network issues
@@ -84,49 +84,55 @@ func badgeHandler(w http.ResponseWriter, r *http.Request, username, repo string,
 	// org + name + projectID
 	// org + multiple projectIDs
 	var totalIssues int
-	name := fmt.Sprintf(username + "/" + repo + ":")
+	var valid bool
+	name := fmt.Sprintf(username + "/" + repo)
+	// name := fmt.Sprintf(username + "/" + repo + ":")
 	switch len(projectID) {
 	case 0:
-		totalIssues = vulnerabilitiesFound(projects, name, "")
+		totalIssues, valid = vulnerabilitiesFound(projects, name, "")
 	case 1:
-		totalIssues = vulnerabilitiesFound(projects, name, projectID[0])
+		totalIssues, valid = vulnerabilitiesFound(projects, name, projectID[0])
 	default:
 		for _, id := range projectID {
-			totalIssues = vulnerabilitiesFound(projects, name, id)
+			totalIssues, valid = vulnerabilitiesFound(projects, name, id)
 		}
 	}
-	if totalIssues == 0 {
-		// No vulnerabilities
-		badgeURL = GreenURL
-	} else {
-		// Vulnerabilities found
-		// RedURL is created here based on number of vulnerabilities found
-		badgeURL = fmt.Sprintf("https://img.shields.io/badge/vulnerabilities-%d-red?logo=snyk", totalIssues)
+	if valid {
+		if totalIssues == 0 {
+			// No vulnerabilities
+			badgeURL = GreenURL
+		} else {
+			// Vulnerabilities found
+			// RedURL is created here based on number of vulnerabilities found
+			badgeURL = fmt.Sprintf("%s-%d-%s", RedURL, totalIssues, RedURLSuffix)
+		}
 	}
 
 	writeBadge(w, badgeURL)
-	return
 }
 
-func vulnerabilitiesFound(projects []interface{}, name string, projectID string) int {
+func vulnerabilitiesFound(projects []interface{}, name string, projectID string) (int, bool) {
 	var totalIssues int
+	valid := false
 	for _, project := range projects {
 		project := project.(map[string]interface{})
+		// fmt.Println(project["name"], name)
 		if strings.HasPrefix(project["name"].(string), name) || project["id"].(string) == projectID {
 			totalIssues = countVulnerabilities(project)
+			valid = true
 			break
 		}
 	}
-	return totalIssues
+	return totalIssues, valid
 }
 
 func countVulnerabilities(project map[string]interface{}) int {
 	var criticalCount, highCount, mediumCount, lowCount, totalIssues int
-	log.Println("project: ", project)
+	// log.Println("project: ", project)
 	// Count the number of issues
 	issues := project["issueCountsBySeverity"].(map[string]interface{})
 	// fmt.Println("full issues list: ",issues)
-	log.Println("issues: ", issues["critical"], issues["high"], issues["medium"], issues["low"])
+	log.Println("repository: ", project["name"], ", issues: ", issues["critical"], issues["high"], issues["medium"], issues["low"])
 	criticalCount = int(issues["critical"].(float64))
 	highCount = int(issues["high"].(float64))
 	mediumCount = int(issues["medium"].(float64))
@@ -138,19 +144,20 @@ func countVulnerabilities(project map[string]interface{}) int {
 
 // Return the badge image from the shields.io URL
 func writeBadge(w http.ResponseWriter, badgeURL string) {
+	log.Println("badge url: ", badgeURL)
 	// Set the response header
 	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
 
-	client := &http.Client{}
+	// client := &http.Client{}
 
 	req, _ := http.NewRequest("GET", badgeURL, nil)
-	resp, err := client.Do(req)
+	resp, err := Client.Do(req)
 
 	// Could not perform the request
 	// Likely network issues
 	if err != nil {
 		log.Println("Errored when sending request to the Shields server")
-		fmt.Fprintf(w, badgeURL)
+		fmt.Fprint(w, badgeURL)
 		return
 	}
 
@@ -160,12 +167,12 @@ func writeBadge(w http.ResponseWriter, badgeURL string) {
 	// Likely the service is down
 	if resp.StatusCode != 200 {
 		log.Println("Did not receive a 200 OK response from the Shields server")
-		fmt.Fprintf(w, badgeURL)
+		fmt.Fprint(w, badgeURL)
 		return
 	}
 
 	// Write the SVG image to the response object
-	io.Copy(w, resp.Body)
+	_, _ = io.Copy(w, resp.Body)
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +182,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		// if fails to parse URL parameters, just answer it quickly
 		writeBadge(w, UnknownURL)
 		return
+	}
+	if len(values) == 0 {
+		log.Println("parameters are empty: ", values)
 	}
 	// Parse URL parameters
 	org := values.Get("org")
@@ -191,18 +201,25 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	case org == "":
 		writeBadge(w, UnknownURL)
 		return
-	case name == "" || len(projectID) == 0:
+	case name == "" && len(projectID) == 0:
 		writeBadge(w, UnknownURL)
 		return
 	}
 	// try to write a correct badge
-	badgeHandler(w, r, org, name, projectID)
+	badgeHandler(w, r, APIURL, org, name, projectID)
 }
 
 func versionHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("url path: ", r.URL.Path)
+	w.Header().Set("Content-Type", "application/json")
 	message := fmt.Sprintf("{\"version\": \"%s\", \"commit\":\"%s\"}", Version, Commit)
 	fmt.Fprint(w, message)
+}
+
+func init() {
+	Client = &http.Client{}
+	// Generate the Snyk API URL
+	APIURL = fmt.Sprintf("https://snyk.io/api/v1/org/%s/projects", os.Getenv("SNYK_ORG_ID"))
 }
 
 func main() {
