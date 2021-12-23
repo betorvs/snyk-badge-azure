@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 )
 
 var (
@@ -117,10 +116,15 @@ func vulnerabilitiesFound(projects []interface{}, name string, projectID string)
 	for _, project := range projects {
 		project := project.(map[string]interface{})
 		// fmt.Println(project["name"], name)
-		if strings.HasPrefix(project["name"].(string), name) || project["id"].(string) == projectID {
-			totalIssues = countVulnerabilities(project)
+		if project["name"].(string) == name {
+			totalIssues = totalIssues + countVulnerabilities(project)
 			valid = true
-			break
+			// continue
+		}
+		if project["id"].(string) == projectID {
+			totalIssues = totalIssues + countVulnerabilities(project)
+			valid = true
+			// continue
 		}
 	}
 	return totalIssues, valid
