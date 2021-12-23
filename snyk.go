@@ -180,7 +180,7 @@ func writeBadge(w http.ResponseWriter, badgeURL string) {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	log.Println("url path: ", r.URL.Path)
+	log.Println("url path: ", r.URL.Path, r.URL.RawQuery)
 	values, err := url.ParseQuery(r.URL.RawQuery)
 	if err != nil {
 		// if fails to parse URL parameters, just answer it quickly
