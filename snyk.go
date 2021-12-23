@@ -117,10 +117,15 @@ func vulnerabilitiesFound(projects []interface{}, name string, projectID string)
 	for _, project := range projects {
 		project := project.(map[string]interface{})
 		// fmt.Println(project["name"], name)
-		if strings.HasPrefix(project["name"].(string), name) || project["id"].(string) == projectID {
-			totalIssues = countVulnerabilities(project)
+		if project["name"].(string) == name {
+			totalIssues = totalIssues + countVulnerabilities(project)
 			valid = true
-			break
+			// continue
+		}
+		if project["id"].(string) == projectID {
+			totalIssues = totalIssues + countVulnerabilities(project)
+			valid = true
+			// continue
 		}
 	}
 	return totalIssues, valid
@@ -176,13 +181,22 @@ func writeBadge(w http.ResponseWriter, badgeURL string) {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	log.Println("url path: ", r.URL.Path)
-	values, err := url.ParseQuery(r.URL.RawQuery)
+	log.Println("url path: ", r.URL.Path, r.URL.RawQuery)
+	parameters := r.URL.RawQuery
+	if strings.Contains(r.URL.RawQuery, ",") {
+		// adjust because azure functions redirect
+		// from: org=Org&id=a1&id=b1
+		// to: org=Org&id=a1,b1
+		log.Println("found comma in parameters :", r.URL.RawQuery)
+		parameters = strings.ReplaceAll(r.URL.RawQuery, ",", "&id=")
+	}
+	values, err := url.ParseQuery(parameters)
 	if err != nil {
 		// if fails to parse URL parameters, just answer it quickly
 		writeBadge(w, UnknownURL)
 		return
 	}
+
 	if len(values) == 0 {
 		log.Println("parameters are empty: ", values)
 	}

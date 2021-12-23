@@ -298,6 +298,14 @@ func TestHandler(t *testing.T) {
 	handler5.ServeHTTP(rr5, req5)
 	assert.Equal(t, http.StatusOK, rr5.Code)
 
+	req6, err6 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryOne&id=e48bd952-7a33-0ad8-fec5-e5d644cb9051,01a88ebb-ee9d-0650-ba1d-c5a93668b36f", nil)
+	assert.NoError(t, err6)
+	rr6 := httptest.NewRecorder()
+	handler6 := http.HandlerFunc(Handler)
+
+	handler6.ServeHTTP(rr6, req6)
+	assert.Equal(t, http.StatusOK, rr6.Code)
+
 }
 
 func TestHandlerErrors(t *testing.T) {
