@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
 var (
@@ -181,12 +182,21 @@ func writeBadge(w http.ResponseWriter, badgeURL string) {
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("url path: ", r.URL.Path, r.URL.RawQuery)
-	values, err := url.ParseQuery(r.URL.RawQuery)
+	parameters := r.URL.RawQuery
+	if strings.Contains(r.URL.RawQuery, ",") {
+		// adjust because azure functions redirect
+		// from: org=Org&id=a1&id=b1
+		// to: org=Org&id=a1,b1
+		log.Println("found comma in parameters :", r.URL.RawQuery)
+		parameters = strings.ReplaceAll(r.URL.RawQuery, ",", "&id=")
+	}
+	values, err := url.ParseQuery(parameters)
 	if err != nil {
 		// if fails to parse URL parameters, just answer it quickly
 		writeBadge(w, UnknownURL)
 		return
 	}
+
 	if len(values) == 0 {
 		log.Println("parameters are empty: ", values)
 	}
