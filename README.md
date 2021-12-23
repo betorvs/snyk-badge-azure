@@ -2,7 +2,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Lint](https://github.com/betorvs/snyk-badge-azure/actions/workflows/lint.yml/badge.svg)](https://github.com/betorvs/snyk-badge-azure/actions/workflows/lint.yml)
 [![Go Test](https://github.com/betorvs/snyk-badge-azure/actions/workflows/test.yml/badge.svg)](https://github.com/betorvs/snyk-badge-azure/actions/workflows/test.yml)
-[![Test Coveralls](https://github.com/betorvs/snyk-badge-azure/actions/workflows/coverage.yml/badge.svg)](https://github.com/betorvs/snyk-badge-azure/actions/workflows/coverage.yml)
+[![Coverage Status](https://coveralls.io/repos/github/betorvs/snyk-badge-azure/badge.svg?branch=main)](https://coveralls.io/github/betorvs/snyk-badge-azure?branch=main)
 
 
 Snyk badge generator for private GitHub repositories.
