@@ -190,6 +190,39 @@ var (
 		},
 		"branch": "master"
 	  }`)
+	SecondProject = []byte(`{
+		"id": "3d8cba82-98a2-9048-685e-19c1147a3f0b",
+		"name": "TestOrg/repositoryTwo",
+		"created": "2019-02-13T08:27:05.018Z",
+		"origin": "github",
+		"type": "sast",
+		"readOnly": false,
+		"testFrequency": "weekly",
+		"isMonitored": true,
+		"totalDependencies": null,
+		"issueCountsBySeverity": {
+		  "low": 0,
+		  "high": 0,
+		  "medium": 0,
+		  "critical": 1
+		},
+		"lastTestedDate": "2019-12-19T21:00:32.622Z",
+		"browseUrl": "https://app.snyk.io/org/TestOrg/project/3d8cba82-98a2-9048-685e-19c1147a3f0b",
+		"owner": null,
+		"importingUser": {
+		  "id": "6576583d-5e80-0b2e-2962-6624d5274be1",
+		  "name": "Roberto Scudeller",
+		  "username": "betorvs",
+		  "email": "betorvs@TestOrg.com"
+		},
+		"tags": [],
+		"attributes": {
+		  "criticality": [],
+		  "lifecycle": [],
+		  "environment": []
+		},
+		"branch": "master"
+	  }`)
 )
 
 func TestVulnerabilitiesFound(t *testing.T) {
@@ -212,11 +245,19 @@ func TestVulnerabilitiesFound(t *testing.T) {
 }
 
 func TestCountVulnerabilities(t *testing.T) {
+	// Test without critical or high
 	var data map[string]interface{}
 	_ = json.Unmarshal([]byte(OneProject), &data)
 	total, critical := countVulnerabilities(data)
 	assert.Equal(t, 1, total)
 	assert.False(t, critical)
+
+	// test with critical and high
+	var data1 map[string]interface{}
+	_ = json.Unmarshal([]byte(SecondProject), &data1)
+	total1, critical1 := countVulnerabilities(data1)
+	assert.Equal(t, 1, total1)
+	assert.True(t, critical1)
 
 }
 
@@ -310,6 +351,14 @@ func TestHandler(t *testing.T) {
 	handler6.ServeHTTP(rr6, req6)
 	assert.Equal(t, http.StatusOK, rr6.Code)
 
+	// repositoryOne:helm/templates/deployment.yaml
+	req7, err7 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryOne:helm/templates/deployment.yaml", nil)
+	assert.NoError(t, err7)
+	rr7 := httptest.NewRecorder()
+	handler7 := http.HandlerFunc(Handler)
+
+	handler7.ServeHTTP(rr7, req7)
+	assert.Equal(t, http.StatusOK, rr7.Code)
 }
 
 func TestHandlerErrors(t *testing.T) {
