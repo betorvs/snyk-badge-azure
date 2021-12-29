@@ -96,7 +96,11 @@ func badgeHandler(w http.ResponseWriter, r *http.Request, apiURL, username, repo
 		totalIssues, valid, critical = vulnerabilitiesFound(projects, name, projectID[0])
 	default:
 		for _, id := range projectID {
-			totalIssues, valid, critical = vulnerabilitiesFound(projects, name, id)
+			var crit bool
+			totalIssues, valid, crit = vulnerabilitiesFound(projects, name, id)
+			if crit {
+				critical = crit
+			}
 		}
 	}
 	if valid {
@@ -163,6 +167,7 @@ func countVulnerabilities(project map[string]interface{}) (int, bool) {
 	lowCount = int(issues["low"].(float64))
 	if criticalCount != 0 || highCount != 0 {
 		critical = true
+		log.Println("critical found ")
 	}
 	totalIssues = criticalCount + highCount + mediumCount + lowCount
 	return totalIssues, critical
