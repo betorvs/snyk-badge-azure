@@ -190,6 +190,39 @@ var (
 		},
 		"branch": "master"
 	  }`)
+	SecondProject = []byte(`{
+		"id": "3d8cba82-98a2-9048-685e-19c1147a3f0b",
+		"name": "TestOrg/repositoryTwo",
+		"created": "2019-02-13T08:27:05.018Z",
+		"origin": "github",
+		"type": "sast",
+		"readOnly": false,
+		"testFrequency": "weekly",
+		"isMonitored": true,
+		"totalDependencies": null,
+		"issueCountsBySeverity": {
+		  "low": 0,
+		  "high": 0,
+		  "medium": 0,
+		  "critical": 1
+		},
+		"lastTestedDate": "2019-12-19T21:00:32.622Z",
+		"browseUrl": "https://app.snyk.io/org/TestOrg/project/3d8cba82-98a2-9048-685e-19c1147a3f0b",
+		"owner": null,
+		"importingUser": {
+		  "id": "6576583d-5e80-0b2e-2962-6624d5274be1",
+		  "name": "Roberto Scudeller",
+		  "username": "betorvs",
+		  "email": "betorvs@TestOrg.com"
+		},
+		"tags": [],
+		"attributes": {
+		  "criticality": [],
+		  "lifecycle": [],
+		  "environment": []
+		},
+		"branch": "master"
+	  }`)
 )
 
 func TestVulnerabilitiesFound(t *testing.T) {
@@ -198,21 +231,33 @@ func TestVulnerabilitiesFound(t *testing.T) {
 
 	projects := data["projects"].([]interface{})
 	name := "TestOrg/repositoryTwo"
-	totalIssues, valid := vulnerabilitiesFound(projects, name, "")
+	totalIssues, valid, crit := vulnerabilitiesFound(projects, name, "")
 	assert.Equal(t, 1, totalIssues)
 	assert.True(t, valid)
+	assert.False(t, crit)
 
+	// sum all repositories that match name and id
 	name2 := "TestOrg/repositoryOne"
-	totalIssues2, valid2 := vulnerabilitiesFound(projects, name2, "d8257448-587c-08fe-e2e5-fbe5b825fbed")
-	assert.Equal(t, 3, totalIssues2)
+	totalIssues2, valid2, crit := vulnerabilitiesFound(projects, name2, "01a88ebb-ee9d-0650-ba1d-c5a93668b36f")
+	assert.Equal(t, 8, totalIssues2)
 	assert.True(t, valid2)
+	assert.True(t, crit)
 }
 
 func TestCountVulnerabilities(t *testing.T) {
+	// Test without critical or high
 	var data map[string]interface{}
 	_ = json.Unmarshal([]byte(OneProject), &data)
-	total := countVulnerabilities(data)
+	total, critical := countVulnerabilities(data)
 	assert.Equal(t, 1, total)
+	assert.False(t, critical)
+
+	// test with critical and high
+	var data1 map[string]interface{}
+	_ = json.Unmarshal([]byte(SecondProject), &data1)
+	total1, critical1 := countVulnerabilities(data1)
+	assert.Equal(t, 1, total1)
+	assert.True(t, critical1)
 
 }
 
@@ -247,7 +292,7 @@ func TestHandler(t *testing.T) {
 	GreenURL = tss.URL
 	// to avoid it: http://127.0.0.1:65354-5-red?logo=snyk
 	// set RedURL with a / in the end
-	RedURL = fmt.Sprintf("%s/", tss.URL)
+	FoundURL = fmt.Sprintf("%s/", tss.URL)
 
 	// test empty parameters
 	req1, err1 := http.NewRequest("GET", "/api/badges", nil)
@@ -306,6 +351,14 @@ func TestHandler(t *testing.T) {
 	handler6.ServeHTTP(rr6, req6)
 	assert.Equal(t, http.StatusOK, rr6.Code)
 
+	// repositoryOne:helm/templates/deployment.yaml
+	req7, err7 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryOne:helm/templates/deployment.yaml", nil)
+	assert.NoError(t, err7)
+	rr7 := httptest.NewRecorder()
+	handler7 := http.HandlerFunc(Handler)
+
+	handler7.ServeHTTP(rr7, req7)
+	assert.Equal(t, http.StatusOK, rr7.Code)
 }
 
 func TestHandlerErrors(t *testing.T) {
@@ -324,7 +377,7 @@ func TestHandlerErrors(t *testing.T) {
 	GreenURL = tss.URL
 	// to avoid it: http://127.0.0.1:65354-5-red?logo=snyk
 	// set RedURL with a / in the end
-	RedURL = fmt.Sprintf("%s/", tss.URL)
+	FoundURL = fmt.Sprintf("%s/", tss.URL)
 
 	// simple error repository not found
 	req1, err1 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryFour", nil)
@@ -376,13 +429,3 @@ func TestHandlerErrors(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr4.Code)
 
 }
-
-// func TestExec(t *testing.T) {
-// 	go func() {
-// 		err := Exec(":50999")
-// 		assert.NoError(t, err)
-// 	}()
-// 	quit := make(chan os.Signal, 1)
-// 	<-quit
-
-// }
