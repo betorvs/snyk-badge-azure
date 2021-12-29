@@ -198,21 +198,25 @@ func TestVulnerabilitiesFound(t *testing.T) {
 
 	projects := data["projects"].([]interface{})
 	name := "TestOrg/repositoryTwo"
-	totalIssues, valid := vulnerabilitiesFound(projects, name, "")
+	totalIssues, valid, crit := vulnerabilitiesFound(projects, name, "")
 	assert.Equal(t, 1, totalIssues)
 	assert.True(t, valid)
+	assert.False(t, crit)
 
+	// sum all repositories that match name and id
 	name2 := "TestOrg/repositoryOne"
-	totalIssues2, valid2 := vulnerabilitiesFound(projects, name2, "d8257448-587c-08fe-e2e5-fbe5b825fbed")
-	assert.Equal(t, 3, totalIssues2)
+	totalIssues2, valid2, crit := vulnerabilitiesFound(projects, name2, "01a88ebb-ee9d-0650-ba1d-c5a93668b36f")
+	assert.Equal(t, 8, totalIssues2)
 	assert.True(t, valid2)
+	assert.True(t, crit)
 }
 
 func TestCountVulnerabilities(t *testing.T) {
 	var data map[string]interface{}
 	_ = json.Unmarshal([]byte(OneProject), &data)
-	total := countVulnerabilities(data)
+	total, critical := countVulnerabilities(data)
 	assert.Equal(t, 1, total)
+	assert.False(t, critical)
 
 }
 
@@ -247,7 +251,7 @@ func TestHandler(t *testing.T) {
 	GreenURL = tss.URL
 	// to avoid it: http://127.0.0.1:65354-5-red?logo=snyk
 	// set RedURL with a / in the end
-	RedURL = fmt.Sprintf("%s/", tss.URL)
+	FoundURL = fmt.Sprintf("%s/", tss.URL)
 
 	// test empty parameters
 	req1, err1 := http.NewRequest("GET", "/api/badges", nil)
@@ -324,7 +328,7 @@ func TestHandlerErrors(t *testing.T) {
 	GreenURL = tss.URL
 	// to avoid it: http://127.0.0.1:65354-5-red?logo=snyk
 	// set RedURL with a / in the end
-	RedURL = fmt.Sprintf("%s/", tss.URL)
+	FoundURL = fmt.Sprintf("%s/", tss.URL)
 
 	// simple error repository not found
 	req1, err1 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryFour", nil)
@@ -376,13 +380,3 @@ func TestHandlerErrors(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr4.Code)
 
 }
-
-// func TestExec(t *testing.T) {
-// 	go func() {
-// 		err := Exec(":50999")
-// 		assert.NoError(t, err)
-// 	}()
-// 	quit := make(chan os.Signal, 1)
-// 	<-quit
-
-// }

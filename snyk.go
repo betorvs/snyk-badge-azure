@@ -17,10 +17,12 @@ var (
 	UnknownURL = "https://img.shields.io/badge/vulnerabilities-unknown-inactive?logo=snyk"
 	// GreenURL string
 	GreenURL = "https://img.shields.io/badge/vulnerabilities-0-brightgreen?logo=snyk"
-	// RedURL string
-	RedURL = "https://img.shields.io/badge/vulnerabilities"
+	// FoundURL string
+	FoundURL = "https://img.shields.io/badge/vulnerabilities"
 	// RedURLSuffix string
 	RedURLSuffix = "red?logo=snyk"
+	// YellowURLSuffix string
+	YellowURLSuffix = "yellow?logo=snyk"
 	// Version string
 	Version = "1.0.0"
 	// Commit string
@@ -84,17 +86,17 @@ func badgeHandler(w http.ResponseWriter, r *http.Request, apiURL, username, repo
 	// org + name + projectID
 	// org + multiple projectIDs
 	var totalIssues int
-	var valid bool
+	var valid, critical bool
 	name := fmt.Sprintf(username + "/" + repo)
 	// name := fmt.Sprintf(username + "/" + repo + ":")
 	switch len(projectID) {
 	case 0:
-		totalIssues, valid = vulnerabilitiesFound(projects, name, "")
+		totalIssues, valid, critical = vulnerabilitiesFound(projects, name, "")
 	case 1:
-		totalIssues, valid = vulnerabilitiesFound(projects, name, projectID[0])
+		totalIssues, valid, critical = vulnerabilitiesFound(projects, name, projectID[0])
 	default:
 		for _, id := range projectID {
-			totalIssues, valid = vulnerabilitiesFound(projects, name, id)
+			totalIssues, valid, critical = vulnerabilitiesFound(projects, name, id)
 		}
 	}
 	if valid {
@@ -104,35 +106,48 @@ func badgeHandler(w http.ResponseWriter, r *http.Request, apiURL, username, repo
 		} else {
 			// Vulnerabilities found
 			// RedURL is created here based on number of vulnerabilities found
-			badgeURL = fmt.Sprintf("%s-%d-%s", RedURL, totalIssues, RedURLSuffix)
+			if critical {
+				badgeURL = fmt.Sprintf("%s-%d-%s", FoundURL, totalIssues, RedURLSuffix)
+			} else {
+				badgeURL = fmt.Sprintf("%s-%d-%s", FoundURL, totalIssues, YellowURLSuffix)
+			}
+
 		}
 	}
 
 	writeBadge(w, badgeURL)
 }
 
-func vulnerabilitiesFound(projects []interface{}, name string, projectID string) (int, bool) {
+func vulnerabilitiesFound(projects []interface{}, name string, projectID string) (int, bool, bool) {
 	var totalIssues int
 	valid := false
+	critical := false
 	for _, project := range projects {
 		project := project.(map[string]interface{})
 		// fmt.Println(project["name"], name)
+		// search for "org/name"
 		if project["name"].(string) == name {
-			totalIssues = totalIssues + countVulnerabilities(project)
+			temp, crit := countVulnerabilities(project)
+			totalIssues = totalIssues + temp
 			valid = true
+			critical = crit
 			// continue
 		}
+		// search for id
 		if project["id"].(string) == projectID {
-			totalIssues = totalIssues + countVulnerabilities(project)
+			temp, crit := countVulnerabilities(project)
+			totalIssues = totalIssues + temp
 			valid = true
+			critical = crit
 			// continue
 		}
 	}
-	return totalIssues, valid
+	return totalIssues, valid, critical
 }
 
-func countVulnerabilities(project map[string]interface{}) int {
+func countVulnerabilities(project map[string]interface{}) (int, bool) {
 	var criticalCount, highCount, mediumCount, lowCount, totalIssues int
+	var critical bool
 	// log.Println("project: ", project)
 	// Count the number of issues
 	issues := project["issueCountsBySeverity"].(map[string]interface{})
@@ -142,9 +157,11 @@ func countVulnerabilities(project map[string]interface{}) int {
 	highCount = int(issues["high"].(float64))
 	mediumCount = int(issues["medium"].(float64))
 	lowCount = int(issues["low"].(float64))
-
+	if criticalCount != 0 || highCount != 0 {
+		critical = true
+	}
 	totalIssues = criticalCount + highCount + mediumCount + lowCount
-	return totalIssues
+	return totalIssues, critical
 }
 
 // Return the badge image from the shields.io URL
@@ -207,7 +224,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if len(projectID) > 1 {
 		log.Println("found more than one id: ", projectID)
 	}
-	// Required values
+	// Required values:
 	// org is always required
 	// name == repository name OR
 	// projectID

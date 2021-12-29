@@ -35,7 +35,8 @@ Hits the [List All Projects](https://snyk.docs.apiary.io/#reference/projects/all
 ## Badge generation
 Badges are generated with the help of the awesome [Shields](https://github.com/badges/shields) project. Badges look like
 * <img src="https://img.shields.io/badge/vulnerabilities-0-brightgreen?logo=snyk" alt="no vulnerabilities"/>
-* <img src="https://img.shields.io/badge/vulnerabilities-10-red?logo=snyk" alt="10 vulnerabilities"/>
+* <img src="https://img.shields.io/badge/vulnerabilities-10-yellow?logo=snyk" alt="10 vulnerabilities without high and critical"/> 
+* <img src="https://img.shields.io/badge/vulnerabilities-10-red?logo=snyk" alt="10 vulnerabilities"/> If found critical and high vulnerabilities
 * <img src="https://img.shields.io/badge/vulnerabilities-unknown-inactive?logo=snyk" alt="vulnerabilities unknown"/>
 
 ## Azure config and deploy
