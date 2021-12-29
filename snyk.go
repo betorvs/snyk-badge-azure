@@ -130,7 +130,9 @@ func vulnerabilitiesFound(projects []interface{}, name string, projectID string)
 			temp, crit := countVulnerabilities(project)
 			totalIssues = totalIssues + temp
 			valid = true
-			critical = crit
+			if crit {
+				critical = crit
+			}
 			// continue
 		}
 		// search for id
@@ -138,7 +140,9 @@ func vulnerabilitiesFound(projects []interface{}, name string, projectID string)
 			temp, crit := countVulnerabilities(project)
 			totalIssues = totalIssues + temp
 			valid = true
-			critical = crit
+			if crit {
+				critical = crit
+			}
 			// continue
 		}
 	}
