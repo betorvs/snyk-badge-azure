@@ -24,6 +24,8 @@ As of August 2019, [Snyk](https://snyk.io/) badges currently only work for publi
 
 **Note:** You can use http://localhost:8080/api/badges/?org={username}&name={repo_name}&id={project_id_snyk} to be more precisely which repository you want to have a badge. Or you can sum multiple ids: http://localhost:8080/api/badges/?org={username}&name={repo_name}&id={project_id_snyk}&id={another_project_id_snyk}
 
+**Note:** Only `&id=` is allowed to have multiple values. In Azure Function it receives all values splitted by comma and inside `Handler` func we remove all comma and replace by `&id=` to avoid `url.ParseQuery` error. In Azure we receive instead of `org=TestOrg&id=e48bd952-7a33-0ad8-fec5-e5d644cb9051&id=01a88ebb-ee9d-0650-ba1d-c5a93668b36f` this `org=TestOrg&id=e48bd952-7a33-0ad8-fec5-e5d644cb9051,01a88ebb-ee9d-0650-ba1d-c5a93668b36f`.
+
 **Note:** You can run the build with parameters to make a package with Version and Commit in http://localhost:8080/api/version endpoint.
 ```bash
 go build -ldflags "-s -w -X main.Version=1.0.0 -X main.Commit=$(git rev-parse HEAD)" snyk.go
