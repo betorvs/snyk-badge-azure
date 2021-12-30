@@ -10,7 +10,13 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
+
+type Data struct {
+	Data     map[string]interface{}
+	ExpireOn int64
+}
 
 var (
 	// UnknownURL string
@@ -31,6 +37,8 @@ var (
 	Client *http.Client
 	// APIURL string
 	APIURL string
+	// SnykData Data
+	SnykData Data
 )
 
 // Handle the API request for badge creation.
@@ -40,46 +48,50 @@ func badgeHandler(w http.ResponseWriter, r *http.Request, apiURL, username, repo
 	// Default shields.io badge URL
 	badgeURL := UnknownURL
 
-	// Setup the GET request
-	req, _ := http.NewRequest("GET", apiURL, nil)
+	fmt.Println("request expiration: ", SnykData.ExpireOn)
+	if SnykData.ExpireOn == 0 || SnykData.ExpireOn < time.Now().Unix() {
+		// Setup the GET request
+		req, _ := http.NewRequest("GET", apiURL, nil)
 
-	// Setup the headers
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", os.Getenv("SNYK_API_KEY"))
+		// Setup the headers
+		req.Header.Add("Content-Type", "application/json")
+		req.Header.Add("Authorization", os.Getenv("SNYK_API_KEY"))
 
-	// Perform the request
-	resp, err := Client.Do(req)
+		// Perform the request
+		resp, err := Client.Do(req)
 
-	// Could not perform the request
-	// Likely network issues
-	if err != nil {
-		log.Println("Errored when sending request to the Snyk server")
-		writeBadge(w, badgeURL)
-		return
+		// Could not perform the request
+		// Likely network issues
+		if err != nil {
+			log.Println("Errored when sending request to the Snyk server")
+			writeBadge(w, badgeURL)
+			return
+		}
+
+		defer resp.Body.Close()
+		SnykData.ExpireOn = time.Now().Add(time.Second * 15).Unix()
+		fmt.Println("request expire on: ", SnykData.ExpireOn)
+
+		respBody, _ := ioutil.ReadAll(resp.Body)
+
+		// Non-200 response received
+		// Likely the creds are wrong
+		if resp.StatusCode != 200 {
+			log.Println("Did not receive a 200 OK response from the Snyk server")
+			writeBadge(w, badgeURL)
+			return
+		}
+		// Perform JSON loading of the response
+		// var data map[string]interface{}
+		err = json.Unmarshal([]byte(string(respBody)), &SnykData.Data)
+
+		if err != nil {
+			writeBadge(w, badgeURL)
+			return
+		}
 	}
 
-	defer resp.Body.Close()
-
-	respBody, _ := ioutil.ReadAll(resp.Body)
-
-	// Non-200 response received
-	// Likely the creds are wrong
-	if resp.StatusCode != 200 {
-		log.Println("Did not receive a 200 OK response from the Snyk server")
-		writeBadge(w, badgeURL)
-		return
-	}
-
-	// Perform JSON loading of the response
-	var data map[string]interface{}
-	err = json.Unmarshal([]byte(string(respBody)), &data)
-
-	if err != nil {
-		writeBadge(w, badgeURL)
-		return
-	}
-
-	projects := data["projects"].([]interface{})
+	projects := SnykData.Data["projects"].([]interface{})
 
 	// Check number of vulnerabilities based on search critiria
 	// org + name without projectID
@@ -156,18 +168,18 @@ func vulnerabilitiesFound(projects []interface{}, name string, projectID string)
 func countVulnerabilities(project map[string]interface{}) (int, bool) {
 	var criticalCount, highCount, mediumCount, lowCount, totalIssues int
 	var critical bool
-	// log.Println("project: ", project)
+	// fmt.Println("project: ", project)
 	// Count the number of issues
 	issues := project["issueCountsBySeverity"].(map[string]interface{})
 	// fmt.Println("full issues list: ",issues)
-	log.Println("repository: ", project["name"], ", issues: ", issues["critical"], issues["high"], issues["medium"], issues["low"])
+	fmt.Println("repository: ", project["name"], ", issues: ", issues["critical"], issues["high"], issues["medium"], issues["low"])
 	criticalCount = int(issues["critical"].(float64))
 	highCount = int(issues["high"].(float64))
 	mediumCount = int(issues["medium"].(float64))
 	lowCount = int(issues["low"].(float64))
 	if criticalCount != 0 || highCount != 0 {
 		critical = true
-		log.Println("critical found ")
+		fmt.Println("critical found ")
 	}
 	totalIssues = criticalCount + highCount + mediumCount + lowCount
 	return totalIssues, critical
@@ -175,7 +187,7 @@ func countVulnerabilities(project map[string]interface{}) (int, bool) {
 
 // Return the badge image from the shields.io URL
 func writeBadge(w http.ResponseWriter, badgeURL string) {
-	log.Println("badge url: ", badgeURL)
+	fmt.Println("badge url: ", badgeURL)
 	// Set the response header
 	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
 
@@ -207,13 +219,13 @@ func writeBadge(w http.ResponseWriter, badgeURL string) {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	log.Println("url path: ", r.URL.Path, r.URL.RawQuery)
+	fmt.Println("url path: ", r.URL.Path, r.URL.RawQuery)
 	parameters := r.URL.RawQuery
 	if strings.Contains(r.URL.RawQuery, ",") {
 		// adjust because azure functions redirect
 		// from: org=Org&id=a1&id=b1
 		// to: org=Org&id=a1,b1
-		log.Println("found comma in parameters :", r.URL.RawQuery)
+		fmt.Println("found comma in parameters :", r.URL.RawQuery)
 		parameters = strings.ReplaceAll(r.URL.RawQuery, ",", "&id=")
 	}
 	values, err := url.ParseQuery(parameters)
@@ -224,14 +236,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(values) == 0 {
-		log.Println("parameters are empty: ", values)
+		fmt.Println("parameters are empty: ", values)
 	}
 	// Parse URL parameters
 	org := values.Get("org")
 	name := values.Get("name")
 	projectID := values["id"]
 	if len(projectID) > 1 {
-		log.Println("found more than one id: ", projectID)
+		fmt.Println("found more than one id: ", projectID)
 	}
 	// Required values:
 	// org is always required
@@ -250,7 +262,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func versionHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("url path: ", r.URL.Path)
+	fmt.Println("url path: ", r.URL.Path)
 	w.Header().Set("Content-Type", "application/json")
 	message := fmt.Sprintf("{\"version\": \"%s\", \"commit\":\"%s\"}", Version, Commit)
 	fmt.Fprint(w, message)
@@ -260,6 +272,7 @@ func init() {
 	Client = &http.Client{}
 	// Generate the Snyk API URL
 	APIURL = fmt.Sprintf("https://snyk.io/api/v1/org/%s/projects", os.Getenv("SNYK_ORG_ID"))
+	SnykData = Data{}
 }
 
 func main() {
@@ -270,6 +283,6 @@ func main() {
 
 	http.HandleFunc("/api/badges", Handler)
 	http.HandleFunc("/api/version", versionHandler)
-	log.Printf("Listen on %s. Go to https://127.0.0.1%s/", listenAddr, listenAddr)
+	fmt.Printf("Listen on %s. Go to https://127.0.0.1%s/", listenAddr, listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
 }

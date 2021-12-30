@@ -305,6 +305,7 @@ func TestHandler(t *testing.T) {
 	assert.Empty(t, res)
 
 	// repository:  TestOrg/repositoryOne:helm/templates/deployment.yaml
+	SnykData.ExpireOn = 0
 	req2, err2 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryOne", nil)
 	assert.NoError(t, err2)
 	rr2 := httptest.NewRecorder()
@@ -315,6 +316,7 @@ func TestHandler(t *testing.T) {
 	assert.Equal(t, res.Header["Content-Type"], []string{"application/json"})
 
 	// repository:  TestOrg/repositoryOne:helm/templates/deployment.yaml
+	SnykData.ExpireOn = 0
 	req3, err3 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryOne&id=01a88ebb-ee9d-0650-ba1d-c5a93668b36f", nil)
 	assert.NoError(t, err3)
 	rr3 := httptest.NewRecorder()
@@ -323,8 +325,8 @@ func TestHandler(t *testing.T) {
 	handler3.ServeHTTP(rr3, req3)
 	assert.Equal(t, http.StatusOK, rr3.Code)
 
-	// ??
-	fmt.Println("/api/badges?org=TestOrg&name=repositoryThree")
+	//
+	SnykData.ExpireOn = 0
 	req4, err4 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryThree", nil)
 	assert.NoError(t, err4)
 	rr4 := httptest.NewRecorder()
@@ -335,6 +337,7 @@ func TestHandler(t *testing.T) {
 
 	//repository:  TestOrg/repositoryOne , issues:  0 0 3 0
 	// repository:  TestOrg/repositoryOne:helm/templates/deployment.yaml
+	SnykData.ExpireOn = 0
 	req5, err5 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryOne&id=e48bd952-7a33-0ad8-fec5-e5d644cb9051&id=01a88ebb-ee9d-0650-ba1d-c5a93668b36f", nil)
 	assert.NoError(t, err5)
 	rr5 := httptest.NewRecorder()
@@ -343,6 +346,8 @@ func TestHandler(t *testing.T) {
 	handler5.ServeHTTP(rr5, req5)
 	assert.Equal(t, http.StatusOK, rr5.Code)
 
+	// id with comma
+	SnykData.ExpireOn = 0
 	req6, err6 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryOne&id=e48bd952-7a33-0ad8-fec5-e5d644cb9051,01a88ebb-ee9d-0650-ba1d-c5a93668b36f", nil)
 	assert.NoError(t, err6)
 	rr6 := httptest.NewRecorder()
@@ -352,6 +357,7 @@ func TestHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr6.Code)
 
 	// repositoryOne:helm/templates/deployment.yaml
+	SnykData.ExpireOn = 0
 	req7, err7 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryOne:helm/templates/deployment.yaml", nil)
 	assert.NoError(t, err7)
 	rr7 := httptest.NewRecorder()
@@ -359,6 +365,17 @@ func TestHandler(t *testing.T) {
 
 	handler7.ServeHTTP(rr7, req7)
 	assert.Equal(t, http.StatusOK, rr7.Code)
+
+	// id with comma and name with wrong order
+	fmt.Println("test multiple names")
+	SnykData.ExpireOn = 0
+	req8, err8 := http.NewRequest("GET", "/api/badges?org=TestOrg&id=e48bd952-7a33-0ad8-fec5-e5d644cb9051,01a88ebb-ee9d-0650-ba1d-c5a93668b36f&name=repositoryOne,repositoryTwo", nil)
+	assert.NoError(t, err8)
+	rr8 := httptest.NewRecorder()
+	handler8 := http.HandlerFunc(Handler)
+
+	handler8.ServeHTTP(rr8, req8)
+	assert.Equal(t, http.StatusOK, rr8.Code)
 }
 
 func TestHandlerErrors(t *testing.T) {
@@ -380,6 +397,7 @@ func TestHandlerErrors(t *testing.T) {
 	FoundURL = fmt.Sprintf("%s/", tss.URL)
 
 	// simple error repository not found
+	SnykData.ExpireOn = 0
 	req1, err1 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryFour", nil)
 	assert.NoError(t, err1)
 	rr1 := httptest.NewRecorder()
@@ -395,6 +413,7 @@ func TestHandlerErrors(t *testing.T) {
 	UnknownURL = tss2.URL
 
 	// force fail with required name or id as parameters
+	SnykData.ExpireOn = 0
 	req2, err2 := http.NewRequest("GET", "/api/badges?org=TestOrg", nil)
 	assert.NoError(t, err2)
 	rr2 := httptest.NewRecorder()
@@ -404,6 +423,7 @@ func TestHandlerErrors(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr2.Code)
 
 	// force url.ParseQuery to fail
+	SnykData.ExpireOn = 0
 	req3, err3 := http.NewRequest("GET", "/api/badges?org=TestOrg%%", nil)
 	assert.NoError(t, err3)
 	rr3 := httptest.NewRecorder()
@@ -420,6 +440,7 @@ func TestHandlerErrors(t *testing.T) {
 	defer tss3.Close()
 	APIURL = tss3.URL
 	// forcing json.Unmarshal error
+	SnykData.ExpireOn = 0
 	req4, err4 := http.NewRequest("GET", "/api/badges?org=TestOrg&name=repositoryTwo", nil)
 	assert.NoError(t, err4)
 	rr4 := httptest.NewRecorder()
